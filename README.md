@@ -46,7 +46,7 @@ python tools/artnet_send.py --target 192.168.4.1 --source-ip 192.168.4.2 --patte
 ## Current Working LED Config
 
 ESP32S3: LED Output on GPIO18
-ESP32S2: LED Output on GPIO15
+ESP32S2: LED Output on GPIO16
 
 LED timing/model: `WS2812`
 LED count: `12` which is `36` channels in total.
