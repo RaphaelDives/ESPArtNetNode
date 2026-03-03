@@ -10,7 +10,7 @@ When it seems to works like it should I moved on to a ESP32S2 WEMOS Mini S2 Boar
 ## Disclaimer
 
 This project was created with extensive use of Chat-GPT-5.3-codex, which did most of the work.
-There are some notes that GPT wanted to share with the world in [NOTES.md](NOTES.md).
+There are some notes that GPT wanted to share with the world or with its future "it" in [NOTES.md](NOTES.md).
 
 On one hand this project is here that I will find it later again, on the other hand I never saw a project like this before, so maybe it could be of some use to someone, at least to see that it is posible! ;) (I really wonder why nobody had this idea before...)
 
