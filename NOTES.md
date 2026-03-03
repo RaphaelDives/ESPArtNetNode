@@ -1,61 +1,112 @@
-# ESPArtNetNode Resume Notes (2026-02-25)
+# ESPArtNetNode Resume Notes
 
-## Current known-good setup
+This file is intended as a portable handoff for future work (different machine, date, or assistant).
 
-- Board: ESP32-S3-WROOM-1 N8R2
-- USB network mode: USB-NCM
-- Art-Net UDP port: 6454
-- ESP USB-NCM IP: 192.168.4.1
-- Host USB adapter IP (typically): 192.168.4.2
+## Project purpose
 
-## LED output settings (confirmed working)
+- ESP32 USB-NCM Art-Net receiver driving addressable LEDs.
+- Art-Net UDP port: `6454`.
+- Current app supports target profiles for **ESP32-S2** and **ESP32-S3**.
 
-- External LED data GPIO: 18
-- LED model/timing: WS2812 (required for Qanba buttons on this setup)
-- Color format: GRB
-- Output inversion: OFF
-- Drive strength: strongest (GPIO_DRIVE_CAP_3)
-- Configured LED count: 12 (safe to use even if fewer are connected)
+## Current behavior (baseline)
 
-## Qanba harness findings
+- Receives Art-Net DMX data and maps channels to RGB LED output.
+- Startup self-test is enabled:
+  - color cycle `red -> green -> blue -> white -> off`
+  - then a walking single white pixel test
+- Idle mode is implemented and activates after timeout when no mapped Art-Net frames are received.
 
-- Harness wiring: GND / DATA / VCC into chain, per-button pins GND / DIN / VCC / DOUT
-- Symptom was "white latch" on boot with non-working control.
-- Working solution was switching timing from WS2811 to WS2812 and moving data pin to GPIO18.
+## Known-good configuration (last validated)
 
-## Boot behavior currently enabled
+- Hardware used: ESP32-S3-WROOM-1 N8R2.
+- USB network mode: USB-NCM.
+- Device IP on USB link: `192.168.4.1`.
+- Typical host adapter IP: `192.168.4.2` (host-side may vary).
+- LED setup:
+  - model/timing: `WS2812`
+  - color format: `GRB`
+  - output inversion: `OFF`
+  - drive strength: `GPIO_DRIVE_CAP_3`
+  - configured LED count: `12`
 
-- Startup self-test remains enabled:
-  - Full-strip color cycle: red -> green -> blue -> white -> off
-  - Then walking single white pixel across configured LED count
+## Target profile mapping in code
 
-## Sender defaults (tools/artnet_send.py)
+Defined in `main/main.c`:
 
-- Default target: 192.168.4.1
-- Default channels: 36 (12 RGB LEDs)
+- **ESP32-S2 profile**
+  - `OUTPUT_LED_STRIP_GPIO = 16`
+  - `STATUS_LED_GPIO = 15`
+  - `STATUS_LED_USE_GPIO = 1`
+- **ESP32-S3 profile**
+  - `OUTPUT_LED_STRIP_GPIO = 18`
+  - `STATUS_LED_GPIO = 48`
+  - `STATUS_LED_USE_GPIO = 0`
 
-## Useful send commands
+## How to configure per target (S3 vs S2)
 
-- Basic rainbow (uses defaults):
-  - python tools/artnet_send.py --pattern rainbow --fps 20 --count 120
+Use these as resume steps before build/flash when switching hardware.
 
-- Force source binding to USB adapter (useful on multi-NIC hosts):
-  - python tools/artnet_send.py --target 192.168.4.1 --source-ip 192.168.4.2 --pattern rainbow --fps 20 --count 120
+### ESP32-S3 (last validated)
 
-- 2-LED explicit test sequence (R/G/B/off):
-  - python tools/artnet_send.py --target 192.168.4.1 --source-ip 192.168.4.2 --pattern solid --rgb 255,0,0 --channels 6 --fps 20 --count 60
-  - python tools/artnet_send.py --target 192.168.4.1 --source-ip 192.168.4.2 --pattern solid --rgb 0,255,0 --channels 6 --fps 20 --count 60
-  - python tools/artnet_send.py --target 192.168.4.1 --source-ip 192.168.4.2 --pattern solid --rgb 0,0,255 --channels 6 --fps 20 --count 60
-  - python tools/artnet_send.py --target 192.168.4.1 --source-ip 192.168.4.2 --pattern solid --rgb 0,0,0 --channels 6 --fps 20 --count 60
+1. Set build target to `esp32s3`.
+2. In menuconfig, keep TinyUSB network mode on **NCM**.
+3. Flash and monitor.
+4. Verify host gets USB-NCM adapter on subnet `192.168.4.x` and test Art-Net send to `192.168.4.1`.
 
-## Next planned improvements
+Expected profile behavior in code:
 
-- Optional idle animation mode when no Art-Net frames are received
-- Automatic handoff to Art-Net when packets arrive
-- Optional disable switch for startup self-test once wiring is finalized
+- Output LED data pin: `GPIO18`
+- Status LED pin: `GPIO48` (status GPIO mode disabled by default)
+- LED timing/model: `WS2812`
 
-## Notes about monitor issues
+### ESP32-S2
 
-- Flashing on COM14 works reliably.
-- Some idf.py monitor invocations failed in shell; direct monitor script invocation worked earlier.
-- If needed later, focus on functionality first, monitor tooling can be normalized separately.
+1. Set build target to `esp32s2`.
+2. In menuconfig, keep TinyUSB network mode on **NCM** (if available for board/IDF version).
+3. Flash and monitor.
+4. Verify Art-Net reception over USB network and LED output on the S2 profile pin.
+
+Expected profile behavior in code:
+
+- Output LED data pin: `GPIO16`
+- Status LED pin: `GPIO15` (`STATUS_LED_USE_GPIO = 1`)
+- LED timing/model: `WS2812`
+
+### Notes when switching between S3 and S2
+
+- After changing target, do a clean rebuild to avoid stale artifacts.
+- `sdkconfig` is local/ignored in this repo; regenerate via menuconfig on each machine as needed.
+- If output is wrong after a target switch, verify the selected target first, then pin wiring.
+
+## Sender script defaults
+
+`tools/artnet_send.py` defaults are tuned for the baseline:
+
+- default target: `192.168.4.1`
+- default channels: `36` (12 RGB LEDs)
+
+Useful examples:
+
+- Basic rainbow:
+  - `python tools/artnet_send.py --pattern rainbow --fps 20 --count 120`
+- With explicit source bind (multi-NIC host):
+  - `python tools/artnet_send.py --target 192.168.4.1 --source-ip 192.168.4.2 --pattern rainbow --fps 20 --count 120`
+
+## Environment and tooling notes
+
+- Serial ports are machine-dependent (COM number varies); do not rely on a fixed COM port in docs or scripts.
+- If monitor tooling behaves inconsistently, prioritize build/flash/functionality first, then normalize monitor command usage.
+
+## Suggested first checks when resuming work
+
+1. Confirm selected ESP-IDF target (`esp32s2` vs `esp32s3`).
+2. Build and flash successfully.
+3. Verify USB-NCM interface appears on host and has expected IP subnet.
+4. Send a short rainbow pattern from `tools/artnet_send.py`.
+5. If LEDs misbehave, re-check timing model (`WS2812`) and output GPIO for the active profile.
+
+## Candidate next improvements
+
+- Add optional runtime switch to disable startup self-test.
+- Improve idle animation customization.
+- Add brief troubleshooting section in `README.md` for host network adapter/IP binding.
